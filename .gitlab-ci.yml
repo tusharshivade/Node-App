@@ -19,8 +19,8 @@ test_job:
   - dev
 
 push_jobs:
- stags: push_to_dockerhub
- scripts:
+ stage: push_to_dockerhub
+ script:
   - docker login -u $DOCKERHUB_USER -p $DOCKERHUB_PASS
   - docker image tag node-app:latest $DOCKERHUB_USER/node-app:latest
   - docker push $DOCKERHUB_USER/node-app:latest
@@ -29,7 +29,7 @@ push_jobs:
 
 deploy_job:
  stage: deploy
- scripts:
+ script:
    - docker-compose up -d
  tags:
   - dev
