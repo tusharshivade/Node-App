@@ -32,7 +32,7 @@ push_jobs:
     - docker push $DOCKERHUB_USER/node-app:latest
   tags:
     - bash
-
+ #deploy the app 
 deploy_job:
   stage: deploy
   image: docker:24.0.5
