@@ -9,14 +9,14 @@ build_job:
  script:
   - docker build -t node-app:latest .
  tags:
-  - dev
+  - bash
 
 test_job:
  stage: test
  script:
   - echo "testing starts.. ... ... . .. "
  tags:
-  - dev
+  - bash
 
 push_jobs:
  stage: push_to_dockerhub
@@ -25,11 +25,11 @@ push_jobs:
   - docker image tag node-app:latest $DOCKERHUB_USER/node-app:latest
   - docker push $DOCKERHUB_USER/node-app:latest
  tags:
-  - dev
+  - bash
 
 deploy_job:
  stage: deploy
  script:
    - docker-compose up -d
  tags:
-  - dev
+  - bash
