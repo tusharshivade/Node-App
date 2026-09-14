@@ -4,6 +4,10 @@ stages:
   - push_to_dockerhub
   - deploy
 
+# Tell the Docker CLI to use the mounted host socket
+variables:
+  DOCKER_HOST: unix:///var/run/docker.sock
+
 build_job:
   stage: build
   image: docker:24.0.5
