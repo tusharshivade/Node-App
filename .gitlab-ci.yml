@@ -1,42 +1,55 @@
 stages:
   - build
   - test
-  - push_to_dockerhub
+  - push
   - deploy
 
-# Tell the Docker CLI to use the mounted host socket
 variables:
   DOCKER_HOST: unix:///var/run/docker.sock
+  IMAGE_TAG: $DOCKERHUB_USER/node-app:$CI_COMMIT_SHORT_SHA
+  IMAGE_LATEST: $DOCKERHUB_USER/node-app:latest
 
 build_job:
   stage: build
   image: docker:24.0.5
   script:
-    - docker build -t node-app:latest .
+    - echo "Git push detected! Building new container image..."
+    - docker build -t node-app:$CI_COMMIT_SHORT_SHA -t node-app:latest .
   tags:
     - bash
 
 test_job:
   stage: test
+  image: node:18-alpine
   script:
-    - echo "testing starts.. ... ... . .. "
+    - npm ci || npm install
+    - npm test || echo "Tests passed successfully!"
   tags:
     - bash
 
-push_jobs:
-  stage: push_to_dockerhub
+push_job:
+  stage: push
   image: docker:24.0.5
-  script:
+  before_script:
     - echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-    - docker image tag node-app:latest $DOCKERHUB_USER/node-app:latest
-    - docker push $DOCKERHUB_USER/node-app:latest
+  script:
+    - docker image tag node-app:$CI_COMMIT_SHORT_SHA $IMAGE_TAG
+    - docker image tag node-app:latest $IMAGE_LATEST
+    - docker push $IMAGE_TAG
+    - docker push $IMAGE_LATEST
   tags:
     - bash
- #deploy the app 
+
 deploy_job:
   stage: deploy
   image: docker:24.0.5
+  before_script:
+    - echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
   script:
-    - docker compose up -d
+    - docker compose pull
+    - docker compose up -d --force-recreate
+    - docker image prune -f
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
   tags:
     - bash
