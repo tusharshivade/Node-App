@@ -94,7 +94,7 @@ jobs:
     name: Deploy to Server
     runs-on: ubuntu-latest      # Note: Production server par deploy ke liye yahan 'self-hosted' runner use kar sakte hain
     needs: build_and_push_job   # IMPORTANT: 'build_and_push_job' ke success hone par chalega
-    if: github.ref_name == 'main' # CONDITION: Ye step KAVAL 'main' branch ke push par chalega
+    if: github.ref_name == 'master' # CONDITION: Ye step KAVAL 'main' branch ke push par chalega
 
     steps:
       # Step 1: Docker Compose file read karne ke liye code checkout karta hai
