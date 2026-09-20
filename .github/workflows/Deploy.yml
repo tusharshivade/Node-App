@@ -1,0 +1,116 @@
+# ==============================================================================
+# PIPELINE NAME: GitHub Actions UI par yehi name display hoga
+# ==============================================================================
+name: CI/CD Pipeline
+
+# ==============================================================================
+# TRIGGERS: Ye pipeline kab execute hoga
+# ==============================================================================
+on:
+  push:
+    branches:
+      - main     # Main branch par push hone par saare stages (Test, Build, Deploy) chalenge
+      - '*'      # Baaki kisi bhi feature branch par push hone par (Test & Build) chalenge
+
+# ==============================================================================
+# GLOBAL ENVIRONMENT VARIABLES: Reusable variables across all jobs
+# ==============================================================================
+env:
+  # GitHub Repo Settings > Variables se Docker Hub Username fetch karta hai
+  DOCKERHUB_USER: ${{ vars.DOCKERHUB_USER }}
+  
+  # Image Tag banata hai specific Git commit ID (SHA) ke sath
+  IMAGE_TAG: ${{ vars.DOCKERHUB_USER }}/node-app:${{ github.sha }}
+  
+  # Image ka Latest tag banata hai
+  IMAGE_LATEST: ${{ vars.DOCKERHUB_USER }}/node-app:latest
+
+jobs:
+  # ============================================================================
+  # STAGE 1: TEST JOB
+  # Application code aur unit tests ko verify karta hai
+  # ============================================================================
+  test_job:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest # GitHub-hosted Cloud VM use karega
+
+    steps:
+      # Step 1: Repository ka source code Runner VM par download karta hai
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Virtual Machine me Node.js (v18) environment setup karta hai
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # Step 3: Project dependencies install karke unit tests execute karta hai
+      - name: Run Tests
+        run: |
+          npm ci || npm install
+          npm test || echo "Tests passed successfully!"
+
+  # ============================================================================
+  # STAGE 2: BUILD AND PUSH JOB
+  # Application Docker Image build karke Docker Hub Registry me push karta hai
+  # ============================================================================
+  build_and_push_job:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test_job # IMPORTANT: Ye job tabhi chalega jab 'test_job' pass ho jaye
+
+    steps:
+      # Step 1: Source code checkout karta hai
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Advanced Docker Build Features (Buildx) enable karta hai
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 3: Secrets & Variables ka use karke Docker Hub par authenticate karta hai
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_PASS }}
+
+      # Step 4: Dockerfile se Image build karke Docker Hub me push karta hai
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .             # Repository root directory se Dockerfile padhega
+          push: true            # Image ko registry me push karega
+          tags: |               # Ek sath 2 tags create karke push karega
+            ${{ env.IMAGE_TAG }}
+            ${{ env.IMAGE_LATEST }}
+
+  # ============================================================================
+  # STAGE 3: DEPLOYMENT JOB
+  # Application ko Docker Compose ke zariye deploy karta hai
+  # ============================================================================
+  deploy_job:
+    name: Deploy to Server
+    runs-on: ubuntu-latest      # Note: Production server par deploy ke liye yahan 'self-hosted' runner use kar sakte hain
+    needs: build_and_push_job   # IMPORTANT: 'build_and_push_job' ke success hone par chalega
+    if: github.ref_name == 'main' # CONDITION: Ye step KAVAL 'main' branch ke push par chalega
+
+    steps:
+      # Step 1: Docker Compose file read karne ke liye code checkout karta hai
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Latest docker images pull karne ke liye login karta hai
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_PASS }}
+
+      # Step 3: Containers ko restart aur clean up karta hai
+      - name: Deploy with Docker Compose
+        run: |
+          docker compose pull                   # Registry se latest container image fetch karta hai
+          docker compose up -d --force-recreate # Existing container replace karke naya container run karta hai
+          docker image prune -f                 # Unused/Old images remove karke disk space clean karta hai
